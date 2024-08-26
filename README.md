@@ -44,6 +44,15 @@ In order to know what a GpioInt with wake being set maps to (in terms of GPIO nu
 
 Thats what, this tool, does in a nutshell, for you.
 
+If you ever want to add a new wakable interrupt yourself in ACPI, then this is the order of operations:
+
+- First check your GPIO Number that you want to be wakable is supported by the qcgpio driver as a wakable source, by going into the hardcoded table of GPIO Numbers <-> PDC IRQ mappings of the driver, and seeing if an entry exists for this GPIO Number
+- Once an entry is found, get the PDC IRQ this GPIO Number is mapped to
+- In ACPI, add an Interrupt resource under GIO0 for this PDC IRQ (Note: you will make your life easier if you add it at the very last and not in the middle of other interrupts as doing so would offset every other virtual gpio already defined in acpi and would require patching every other wake gpioint already in use!)
+- Then under your device, declare a GpioInt using the virtual value of 64 times the index of the interrupt resource you just added under QCGPIO (GIO0)
+
+It cant be simpler! :)
+
 ### Sample Usage
 
 ```
