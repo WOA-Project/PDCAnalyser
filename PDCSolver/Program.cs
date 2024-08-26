@@ -42,7 +42,7 @@ namespace PDCSolver
 
             int tileInterruptCount = (TotalGPIOs + (64 - (TotalGPIOs % 64))) / 64;
 
-            Console.WriteLine("We determined that your GPIO controller supports " + tileInterruptCount + " tiles.");
+            Console.WriteLine($"We determined that your GPIO controller supports {tileInterruptCount} tiles.");
             Console.WriteLine();
 
             Console.WriteLine($"Please now start entering each interrupt defined under the device resources dependencies (_CRS) skipping the very first {tileInterruptCount} interrupts as they are for the tile banks and not pdcs. This IRQs are defined as standard Interrupt resources. When done, just press enter with nothing specified. And we will continue with the next steps!");
@@ -50,11 +50,11 @@ namespace PDCSolver
 
             List<int> DefinedPDCInterrupts = [];
 
+            int index = 0;
             while (true)
             {
-                Console.Write("Interrupt: ");
+                Console.Write($"Interrupt[{index + tileInterruptCount}]: ");
                 string InterruptStr = Console.ReadLine();
-                Console.WriteLine();
 
                 if (string.IsNullOrEmpty(InterruptStr))
                 {
@@ -64,14 +64,7 @@ namespace PDCSolver
                 int Interrupt = ParseStringInput(InterruptStr);
 
                 DefinedPDCInterrupts.Add(Interrupt);
-            }
-
-            Console.WriteLine("Thank you. Listing mapping for the virtual gpio interrupts first (GpioInts) to the PDC IRQs (what you enterred). All GpioInts using such values are directly linked to the PDC IRQs specified under GIO0 resources.");
-            Console.WriteLine();
-
-            for (int i = 0; i < DefinedPDCInterrupts.Count; i++)
-            {
-                Console.WriteLine($"PDC IRQ: {DefinedPDCInterrupts[i]} (0x{DefinedPDCInterrupts[i]:X8}) <-> GpioInt (Virtual) {(i + tileInterruptCount) * 64} (0x{(i + tileInterruptCount) * 64:X8})");
+                index++;
             }
 
             Console.WriteLine();
@@ -81,6 +74,11 @@ namespace PDCSolver
             string QCGPIOStr = Console.ReadLine();
             Console.WriteLine();
 
+            GetMappings(QCGPIOStr, DefinedPDCInterrupts, tileInterruptCount);
+        }
+
+        private static void GetMappings(string QCGPIOStr, List<int> DefinedPDCInterrupts, int tileInterruptCount)
+        {
             List<PDCDriverMapping> PDCDriverMappings = [];
 
             // This seems to be a rather stable pattern, not my best work but does the job on 8180, 7280.
@@ -90,9 +88,7 @@ namespace PDCSolver
             int[] locs = driverBin.Locate(LookUpPattern);
             foreach (int loc in locs)
             {
-                Console.WriteLine($"0x{loc + LookUpPattern.Length:X}");
-
-                Console.WriteLine("Attempting to parse at this location above.");
+                Console.WriteLine($"Attempting to parse driver binary at this location 0x{loc + LookUpPattern.Length:X}.");
 
                 using BinaryReader br = new(new MemoryStream(driverBin));
                 br.BaseStream.Seek(loc + LookUpPattern.Length, SeekOrigin.Begin);
@@ -115,7 +111,7 @@ namespace PDCSolver
                         break;
                     }
 
-                    Console.WriteLine();
+                    /*Console.WriteLine();
                     Console.WriteLine($"PDC IRQ:              {pdcirq} (0x{pdcirq:X8})");
                     Console.WriteLine($"GPIO Pin:             {gpionum} (0x{gpionum:X8})");
                     Console.WriteLine($"GIC Virtual IRQ:      {gicvirtualinterrupt} (0x{gicvirtualinterrupt:X8})");
@@ -124,7 +120,7 @@ namespace PDCSolver
                     Console.WriteLine($"PDC CFG Register:     {pdccfgreg} (0x{pdccfgreg:X8})");
                     Console.WriteLine($"Enabled and Unmasked: {enabledandunmasked} (0x{enabledandunmasked:X8})");
                     Console.WriteLine($"Configured:           {configured} (0x{configured:X8})");
-                    Console.WriteLine();
+                    Console.WriteLine();*/
 
                     PDCDriverMappings.Add(new PDCDriverMapping()
                     {
@@ -140,12 +136,28 @@ namespace PDCSolver
                 }
             }
 
-            Console.WriteLine("Determining PDC Mappings...");
+            Console.WriteLine("Listing mapping for the virtual gpio interrupts first (GpioInts) to the PDC IRQs (what you enterred). All GpioInts using such values are directly linked to the PDC IRQs specified under GIO0 resources.");
+            Console.WriteLine();
+
+            for (int i = 0; i < DefinedPDCInterrupts.Count; i++)
+            {
+                int DefinedPDCIRQ = DefinedPDCInterrupts[i];
+                int VirtualGPIOInterrupt = (i + tileInterruptCount) * 64;
+
+                Console.WriteLine($"PDC IRQ: {DefinedPDCIRQ} (0x{DefinedPDCIRQ:X8}) <-> GpioInt (Virtual) {VirtualGPIOInterrupt} (0x{VirtualGPIOInterrupt:X8})");
+            }
+
+            Console.WriteLine("Determining PDC Mappings from driver...");
             Console.WriteLine();
 
             for (int i = 0; i < PDCDriverMappings.Count; i++)
             {
-                Console.WriteLine($"PDC IRQ: {PDCDriverMappings[i].GICVirtualInterrupt} (0x{PDCDriverMappings[i].GICVirtualInterrupt:X8}) <-> GPIO (Real) {PDCDriverMappings[i].GPIONum} (0x{PDCDriverMappings[i].GPIONum:X8}))");
+                PDCDriverMapping PDCDriverMapping = PDCDriverMappings[i];
+
+                uint DefinedPDCIRQ = PDCDriverMapping.GICVirtualInterrupt;
+                int RealGPIONum = PDCDriverMapping.GPIONum;
+
+                Console.WriteLine($"PDC IRQ: {DefinedPDCIRQ} (0x{DefinedPDCIRQ:X8}) <-> GPIO (Real) {RealGPIONum} (0x{RealGPIONum:X8})");
             }
 
             Console.WriteLine();
