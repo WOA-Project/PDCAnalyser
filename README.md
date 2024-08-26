@@ -13,9 +13,38 @@ PDCSolver is confirmed to work with the following chipset firmware (ACPI and Dri
 
 MSM8998, SDM850, and SC8380 and newer are not supported because these SoCs feature end user configurable mappings in ACPI and/or their INFs. Only SoCs above do not.
 
----
+### Explanation
 
-Sample Usage:
+On above SoCs, a PDC controller is present in order to support scenarios where an interrupt line wired to a gpio on the SoC should wake up the device from sleep.
+
+Said PDC controller requires specific programming in order to be able to wake the device and fire an interrupt for the OS to handle and forward to a specific driver.
+
+On Windows, for these given SoCs, the driver responsible for implementing the GPIO controller, (Input/Output and Interrupts) is qcgpio.sys, providing an easy method in ACPI to set GPIOs and Declare Interrupts using GpioIo and GpioInt ACPI directives.
+
+The problem, is that you cannot make a GPIO IRQ be able to wake the system without waking up the SoC using the PDC by simply defining a GpioInt dependency with a specific number.
+
+The solution adopted in Windows by qualcomm consists of the following:
+
+- Qualcomm Assumes each tile of gpios on the SoC can have a very maximum of 64 gpios per tile
+- As such, for a device with 175 GPIOs supported, the tile count would for example be 3.
+- The GPIO driver on windows is responsible for deciding on its own what the value passed in acpi exactly means.
+- It was therefore decided that for every value between 0 and 174, these would be normal GPIOs, and interrupts setup using those would not be wakable
+- And for wakable GPIOs, instead, they would set up each IRQ of the PDC, under the GIO0 device, and bind each interrupt firing of the PDC; to virtual values, being a multiple of 64 starting from the total number of tiles times 64, to the last interrupt for pdc declared index, times 64
+- The driver contains a hardcoded table, dictating what each PDC IRQ value (Interrupt) maps to which TLMM GPIO number.
+- The driver, whenever it encouters a device using a wakable GPIO Interrupt, reads the value passed in (which is virtual)
+- Using said value, finds for which PDC IRQ it corresponds to (divide the number by 64 to get the index of the interrupt resource under GIO0 in ACPI)
+- and then fire an interrupt event whenever said PDC IRQ fires under GIO0, for the GpioInt declaration of the other device
+
+Thus, there are two parts to this story:
+
+- The GPIO Driver Qualcomm wrote implicitely defines virtual gpio number values, equalling to the index of the PDC IRQ under GIO0, times, 64.
+- The GPIO Driver Qualcomm wrote, binds each PDC IRQ defined in ACPI, with a specific GPIO TLMM Number, to be programmed to the PDC
+
+In order to know what a GpioInt with wake being set maps to (in terms of GPIO number), you thus first need to get which PDC IRQ this virtual gpio value is for (divide by 64), then obtain this interrupt number (under GPIO0), and then, read the table off qcgpio.sys, to know for which GPIO Number, this PDC IRQ value, is for.
+
+Thats what, this tool, does in a nutshell, for you.
+
+### Sample Usage
 
 ```
 PDCSolver
