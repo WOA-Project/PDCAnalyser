@@ -4,6 +4,17 @@ PDCAnalyser, privately nicknamed, __Please Don't Consider Asking__ is a set of t
 
 ## PDCSolver
 
+PDCSolver is confirmed to work with the following chipset firmware (ACPI and Driver):
+
+- Snapdeagon 7c/7c Gen 2 (7180)
+- Snapdragon 7cPlus Gen 3 (7280)
+- Snapdragon 8c/8cx/8cx Gen 2 (8180)
+- Snapdragon 8cx Gen 3 (8280)
+
+MSM8998, SDM850, and SC8380 and newer are not supported because these SoCs feature end user configurable mappings in ACPI and/or their INFs. Only SoCs above do not.
+
+---
+
 Sample Usage:
 
 ```
