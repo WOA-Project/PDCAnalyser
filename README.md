@@ -17,6 +17,8 @@ MSM8998, SDM850, and SC8380 and newer are not supported because these SoCs featu
 
 On above SoCs, a PDC controller is present in order to support scenarios where an interrupt line wired to a GPIO on the SoC should wake the device from sleep.
 
+PDC = Power Domain Controller
+
 Said PDC controller requires specific programming in order to be able to wake the device and fire an interrupt for the OS to handle and forward to a specific driver.
 
 On Windows, for these given SoCs, the driver responsible for implementing the GPIO controller, (Input/Output and Interrupts) is qcgpio.sys, providing an easy method in ACPI to set GPIOs and Declare Interrupts using GpioIo and GpioInt ACPI directives.
@@ -25,7 +27,7 @@ The problem is that you cannot make a GPIO IRQ be able to wake the system withou
 
 The solution adopted in Windows by qualcomm consists of the following:
 
-- Qualcomm Assumes each tile of GPIOs on the SoC can have a very maximum of 64 GPIOs per tile
+- Qualcomm Assumes each tile of GPIOs on the SoC can have a very maximum of 64 GPIOs per tile. (Most likely derived from the MSFT GpioClx framework)
 - As such, for a device with 175 GPIOs supported, the tile count would for example be 3.
 - The GPIO driver on windows is responsible for deciding on its own what the value passed in ACPI exactly means.
 - It was therefore decided that for every value between 0 and 174, these would be normal GPIOs, and interrupts setup using those would not be wakeable
